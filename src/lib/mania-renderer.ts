@@ -15,14 +15,16 @@ export function renderFrame(
   height: number,
   scrollSpeed: number,
   backgroundImage?: HTMLImageElement | ImageBitmap,
-  backgroundDim: number = 0
+  backgroundDim: number = 0,
+  noteColors?: { key1: string; key2: string; key3: string; key4: string }
 ) {
-  const playfieldWidth = Math.min(width * 0.3, 400);
-  const playfieldX = (width - playfieldWidth) / 2;
-  const laneWidth = playfieldWidth / 4;
-  const judgmentY = height * 0.88;
-  const noteHeight = Math.max(14, height * 0.018);
-  const pixelsPerMs = judgmentY / scrollSpeed;
+  const laneColors = noteColors ? [noteColors.key1, noteColors.key2, noteColors.key3, noteColors.key4] : LANE_COLORS;
+  const laneColorsDim = noteColors ? [
+    noteColors.key1 + '40',
+    noteColors.key2 + '40', 
+    noteColors.key3 + '40',
+    noteColors.key4 + '40'
+  ] : LANE_COLORS_DIM;
 
   // Background
   if (backgroundImage) {
@@ -67,6 +69,13 @@ export function renderFrame(
     ctx.fillRect(0, 0, width, height);
   }
 
+  const playfieldWidth = Math.min(width * 0.3, 400);
+  const playfieldX = (width - playfieldWidth) / 2;
+  const laneWidth = playfieldWidth / 4;
+  const judgmentY = height * 0.88;
+  const noteHeight = Math.max(14, height * 0.018);
+  const pixelsPerMs = judgmentY / scrollSpeed;
+
   // Lane backgrounds
   for (let i = 0; i < 4; i++) {
     ctx.fillStyle = LANE_BG[i];
@@ -97,11 +106,17 @@ export function renderFrame(
     if (noteEnd < visibleMinTime) continue;
     if (note.time > visibleMaxTime) break; // notes are sorted by time
 
+    // Don't render notes that have passed the judgment line (simulating they were hit)
+    // But hold notes should remain visible until their end time
+    if (!note.isHold && note.time < currentTime) continue;
+    // Hold notes disappear after their end time
+    if (note.isHold && note.endTime && note.endTime < currentTime) continue;
+
     const col = note.column;
     const x = playfieldX + col * laneWidth + 3;
     const w = laneWidth - 6;
-    const color = LANE_COLORS[col];
-    const dimColor = LANE_COLORS_DIM[col];
+    const color = laneColors[col];
+    const dimColor = laneColorsDim[col];
 
     if (note.isHold && note.endTime) {
       const yHead = judgmentY - (note.time - currentTime) * pixelsPerMs;
@@ -168,7 +183,7 @@ export function renderFrame(
     for (let i = 0; i < 4; i++) {
       if (currentFrame.keys[i]) {
         const lx = playfieldX + i * laneWidth;
-        const color = LANE_COLORS[i];
+        const color = laneColors[i];
 
         // Column flash
         const grad = ctx.createLinearGradient(lx, judgmentY - 80, lx, judgmentY + 15);
@@ -189,7 +204,7 @@ export function renderFrame(
   for (let i = 0; i < 4; i++) {
     const lx = playfieldX + i * laneWidth;
     const pressed = currentFrame?.keys[i] ?? false;
-    ctx.fillStyle = pressed ? LANE_COLORS[i] + 'ff' : '#ffffff20';
+    ctx.fillStyle = pressed ? laneColors[i] + 'ff' : '#ffffff20';
     ctx.fillRect(lx + 3, judgmentY + 5, laneWidth - 6, 6);
   }
 
@@ -200,6 +215,75 @@ export function renderFrame(
   const mins = Math.floor(currentTime / 60000);
   const secs = Math.floor((currentTime % 60000) / 1000);
   ctx.fillText(`${mins}:${secs.toString().padStart(2, '0')}`, playfieldX - 80, judgmentY);
+
+  // Combo counter based on actual replay hits
+  let combo = 0;
+  if (replayFrames.length > 0) {
+    // Analyze replay data to count actual hits
+    let consecutiveHits = 0;
+    
+    for (const note of notes) {
+      if (note.time > currentTime) break;
+      
+      // Check if this note was hit by looking for key presses near the note time
+      const hitWindow = 80; // ms hit window (similar to osu!mania)
+      let wasHit = false;
+      
+      // Look for key presses in the correct lane within the hit window
+      for (const frame of replayFrames) {
+        if (Math.abs(frame.time - note.time) <= hitWindow) {
+          if (frame.keys[note.column]) {
+            wasHit = true;
+            break;
+          }
+        }
+        // Since frames are sorted by time, we can break early
+        if (frame.time > note.time + hitWindow) break;
+      }
+      
+      if (wasHit) {
+        consecutiveHits++;
+        combo = consecutiveHits;
+      } else {
+        // Miss - reset combo
+        consecutiveHits = 0;
+        combo = 0;
+      }
+    }
+  } else {
+    // Fallback for preview without replay
+    for (const note of notes) {
+      if (note.time < currentTime) {
+        combo++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  if (combo > 0) {
+    ctx.save();
+    
+    // Calculate animation based on current time (simple pulsing effect)
+    const pulse = Math.sin(currentTime * 0.01) * 0.1 + 0.9; // Subtle pulsing
+    const scale = combo > 1 ? 1.0 + (pulse * 0.1) : 1.0; // Scale up for higher combos
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(24, height * 0.028) * scale}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    
+    // Add glow effect that intensifies with combo
+    ctx.shadowColor = combo > 10 ? '#ff6b9d' : '#ffffff';
+    ctx.shadowBlur = Math.min(20, combo * 2);
+    
+    const comboText = `${combo}x`;
+    const comboX = 20; // Left side of the video
+    const comboY = height - 40;
+    
+    ctx.fillText(comboText, comboX, comboY);
+    ctx.restore();
+  }
 }
 
 function getFrameAtTime(frames: ReplayFrame[], time: number): ReplayFrame | null {

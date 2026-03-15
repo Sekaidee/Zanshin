@@ -1,10 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Upload, Play, Pause, Download, Music, Gamepad2, AlertCircle, Check, Heart, Image as ImageIcon } from 'lucide-react';
+import { Upload, Play, Pause, Download, Music, Gamepad2, AlertCircle, Check, Heart, Image as ImageIcon, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { parseOsuFile, BeatmapInfo } from '@/lib/osu-parser';
 import { parseOsrFile, ReplayInfo } from '@/lib/osr-parser';
 import { renderFrame, getMapDuration } from '@/lib/mania-renderer';
@@ -17,7 +20,6 @@ const Index = () => {
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
-  const [videoResolution, setVideoResolution] = useState<{width: number, height: number} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fps, setFps] = useState(60);
   const [scrollSpeed, setScrollSpeed] = useState(800);
@@ -28,7 +30,22 @@ const Index = () => {
   const [suggestedAudioName, setSuggestedAudioName] = useState<string>('');
   const [backgroundImage, setBackgroundImage] = useState<File | null>(null);
   const [backgroundImageElement, setBackgroundImageElement] = useState<HTMLImageElement | null>(null);
-  const [backgroundDim, setBackgroundDim] = useState(30);
+  const [backgroundDim, setBackgroundDim] = useState(80);
+  const [videoResolution, setVideoResolution] = useState<'1080p' | '720p' | '480p'>('1080p');
+  const [customizationOpen, setCustomizationOpen] = useState(false);
+  const [styleType, setStyleType] = useState<'zanshin' | 'skin'>('zanshin');
+  const [noteColors, setNoteColors] = useState({
+    key1: '#ff6b9d',
+    key2: '#51e5ff',
+    key3: '#51e5ff',
+    key4: '#ff6b9d'
+  });
+  const [tempNoteColors, setTempNoteColors] = useState({
+    key1: '#ff6b9d',
+    key2: '#51e5ff',
+    key3: '#51e5ff',
+    key4: '#ff6b9d'
+  });
 
   const handleOsuFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,8 +130,8 @@ const Index = () => {
 
     const duration = getMapDuration(beatmap.notes);
     const time = (previewTime / 100) * duration;
-    renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim);
-  }, [beatmap, replay, scrollSpeed, previewTime, playing, backgroundImageElement, backgroundDim]);
+    renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim, noteColors);
+  }, [beatmap, replay, scrollSpeed, previewTime, playing, backgroundImageElement, backgroundDim, noteColors]);
 
   // Playback loop
   useEffect(() => {
@@ -144,7 +161,7 @@ const Index = () => {
           return 100;
         }
         const time = (next / 100) * duration;
-        renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim);
+        renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim, noteColors);
         return next;
       });
       animFrameRef.current = requestAnimationFrame(tick);
@@ -156,7 +173,7 @@ const Index = () => {
       if (audioElement) audioElement.pause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, beatmap, replay, scrollSpeed, audioElement]);
+  }, [playing, beatmap, replay, scrollSpeed, audioElement, backgroundImageElement, backgroundDim, noteColors]);
 
   const handleRender = useCallback(async () => {
     if (!beatmap) return;
@@ -171,9 +188,17 @@ const Index = () => {
     setError(null);
 
     try {
-      // Try 1080p first, encoder will fallback to 720p if needed
-      const width = 1920;
-      const height = 1080;
+      // Get resolution settings
+      const resolutions = {
+        '1080p': { width: 1920, height: 1080 },
+        '720p': { width: 1280, height: 720 },
+        '480p': { width: 854, height: 480 }
+      };
+      
+      const selectedRes = resolutions[videoResolution];
+      const width = selectedRes.width;
+      const height = selectedRes.height;
+      
       const duration = getMapDuration(beatmap.notes);
       const totalFrames = Math.ceil((duration / 1000) * fps);
 
@@ -200,9 +225,9 @@ const Index = () => {
         totalFrames,
         (frameIndex, targetWidth, targetHeight) => {
           const time = (frameIndex / fps) * 1000;
-          renderFrame(ctx, time, beatmap.notes, replayFrames, targetWidth, targetHeight, scrollSpeed, backgroundBitmap, backgroundDim);
+          renderFrame(ctx, time, beatmap.notes, replayFrames, targetWidth, targetHeight, scrollSpeed, backgroundBitmap, backgroundDim, noteColors);
         },
-        { width, height, fps, bitrate: 8_000_000 },
+        { width, height, fps, bitrate: videoResolution === '1080p' ? 8_000_000 : videoResolution === '720p' ? 4_000_000 : 2_000_000 },
         setProgress,
         audioFile || undefined
       );
@@ -210,7 +235,6 @@ const Index = () => {
       const { blob } = result;
 
       setVideoBlob(blob);
-      setVideoResolution({ width: result.width, height: result.height });
       // Auto-download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -223,14 +247,20 @@ const Index = () => {
     } finally {
       setRendering(false);
     }
-  }, [beatmap, replay, fps, scrollSpeed, audioFile, backgroundImage, backgroundDim]);
+  }, [beatmap, replay, fps, scrollSpeed, audioFile, backgroundImage, backgroundDim, videoResolution, noteColors]);
 
   const handleDownload = useCallback(() => {
     if (!videoBlob) return;
     const url = URL.createObjectURL(videoBlob);
     const a = document.createElement('a');
     a.href = url;
-    const resolution = videoResolution ? ` (${videoResolution.width}x${videoResolution.height})` : '';
+    const resolutions = {
+      '1080p': { width: 1920, height: 1080 },
+      '720p': { width: 1280, height: 720 },
+      '480p': { width: 854, height: 480 }
+    };
+    const selectedRes = resolutions[videoResolution];
+    const resolution = ` (${selectedRes.width}x${selectedRes.height})`;
     a.download = `${beatmap?.artist} - ${beatmap?.title} [${beatmap?.version}]${resolution}.mp4`;
     a.click();
     URL.revokeObjectURL(url);
@@ -365,7 +395,215 @@ const Index = () => {
             {/* Preview */}
             <Card className="animate-slide-up overflow-hidden">
               <CardContent className="p-4 space-y-4">
-                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Preview</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Preview</h2>
+                  <Dialog open={customizationOpen} onOpenChange={(open) => {
+                    setCustomizationOpen(open);
+                    if (open) {
+                      // Initialize temp colors when opening
+                      setTempNoteColors(noteColors);
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Card className="cursor-pointer transition-all hover:border-primary/40 hover:glow-primary">
+                        <CardContent className="flex items-center gap-2 p-2">
+                          <Palette className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-medium text-muted-foreground">Style</span>
+                        </CardContent>
+                      </Card>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Visual Customizations</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="style-type">Style Type</Label>
+                          <Select value={styleType} onValueChange={(value: 'zanshin' | 'skin') => setStyleType(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="zanshin">Zanshin Style</SelectItem>
+                              <SelectItem value="skin" disabled>Skin Style (Soon)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {styleType === 'zanshin' && (
+                          <div className="space-y-3">
+                            <Label>Note Colors</Label>
+                            <div className="grid grid-cols-4 gap-3">
+                              <div className="space-y-1">
+                                <Label htmlFor="key1" className="text-xs text-center">Key 1</Label>
+                                <input
+                                  id="key1"
+                                  type="color"
+                                  value={tempNoteColors.key1}
+                                  onChange={(e) => setTempNoteColors(prev => ({ ...prev, key1: e.target.value }))}
+                                  className="w-full h-8 rounded border border-border"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="key2" className="text-xs text-center">Key 2</Label>
+                                <input
+                                  id="key2"
+                                  type="color"
+                                  value={tempNoteColors.key2}
+                                  onChange={(e) => setTempNoteColors(prev => ({ ...prev, key2: e.target.value }))}
+                                  className="w-full h-8 rounded border border-border"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="key3" className="text-xs text-center">Key 3</Label>
+                                <input
+                                  id="key3"
+                                  type="color"
+                                  value={tempNoteColors.key3}
+                                  onChange={(e) => setTempNoteColors(prev => ({ ...prev, key3: e.target.value }))}
+                                  className="w-full h-8 rounded border border-border"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="key4" className="text-xs text-center">Key 4</Label>
+                                <input
+                                  id="key4"
+                                  type="color"
+                                  value={tempNoteColors.key4}
+                                  onChange={(e) => setTempNoteColors(prev => ({ ...prev, key4: e.target.value }))}
+                                  className="w-full h-8 rounded border border-border"
+                                />
+                              </div>
+                            </div>
+                            
+                            {backgroundImage && (
+                              <div className="pt-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    if (!backgroundImage) return;
+                                    
+                                    try {
+                                      const img = new Image();
+                                      await new Promise((resolve, reject) => {
+                                        img.onload = resolve;
+                                        img.onerror = reject;
+                                        img.src = URL.createObjectURL(backgroundImage);
+                                      });
+                                      
+                                      const canvas = document.createElement('canvas');
+                                      const ctx = canvas.getContext('2d')!;
+                                      canvas.width = Math.min(img.width, 200); // Downsample for performance
+                                      canvas.height = Math.min(img.height, 200);
+                                      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                      
+                                      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                      const data = imageData.data;
+                                      
+                                      // Simple color extraction - find most frequent non-black colors
+                                      const colorMap: { [key: string]: { rgb: [number, number, number], count: number } } = {};
+                                      
+                                      // Sample pixels (every 4th pixel for performance)
+                                      for (let i = 0; i < data.length; i += 16) { // Skip every 4 pixels
+                                        const r = data[i];
+                                        const g = data[i + 1];
+                                        const b = data[i + 2];
+                                        const alpha = data[i + 3];
+                                        
+                                        // Skip transparent pixels
+                                        if (alpha < 128) continue;
+                                        
+                                        // Skip very dark colors (black-like)
+                                        const brightness = (r + g + b) / 3;
+                                        if (brightness < 30) continue;
+                                        
+                                        // Skip very light colors (white-like)
+                                        if (brightness > 225) continue;
+                                        
+                                        // Skip gray colors (low saturation)
+                                        const max = Math.max(r, g, b);
+                                        const min = Math.min(r, g, b);
+                                        const saturation = max === 0 ? 0 : (max - min) / max;
+                                        if (saturation < 0.1) continue;
+                                        
+                                        // Quantize to reduce color variations (group similar colors)
+                                        const quantizedR = Math.round(r / 25) * 25;
+                                        const quantizedG = Math.round(g / 25) * 25;
+                                        const quantizedB = Math.round(b / 25) * 25;
+                                        
+                                        const key = `${quantizedR},${quantizedG},${quantizedB}`;
+                                        
+                                        if (colorMap[key]) {
+                                          colorMap[key].count++;
+                                        } else {
+                                          colorMap[key] = {
+                                            rgb: [r, g, b], // Store original RGB for better color
+                                            count: 1
+                                          };
+                                        }
+                                      }
+                                      
+                                      // Get the two most frequent colors
+                                      const sortedColors = Object.values(colorMap)
+                                        .sort((a, b) => b.count - a.count)
+                                        .slice(0, 2);
+                                      
+                                      if (sortedColors.length >= 2) {
+                                        const primaryRGB = sortedColors[0].rgb;
+                                        const secondaryRGB = sortedColors[1].rgb;
+                                        
+                                        const primaryColor = `rgb(${primaryRGB[0]}, ${primaryRGB[1]}, ${primaryRGB[2]})`;
+                                        const secondaryColor = `rgb(${secondaryRGB[0]}, ${secondaryRGB[1]}, ${secondaryRGB[2]})`;
+                                        
+                                        setTempNoteColors({
+                                          key1: primaryColor,
+                                          key2: secondaryColor,
+                                          key3: secondaryColor,
+                                          key4: primaryColor
+                                        });
+                                      } else if (sortedColors.length === 1) {
+                                        // Fallback: use complementary colors
+                                        const rgb = sortedColors[0].rgb;
+                                        const primaryColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+                                        
+                                        // Create a complementary color by shifting hue
+                                        const complementaryR = 255 - rgb[0];
+                                        const complementaryG = 255 - rgb[1];
+                                        const complementaryB = 255 - rgb[2];
+                                        const secondaryColor = `rgb(${complementaryR}, ${complementaryG}, ${complementaryB})`;
+                                        
+                                        setTempNoteColors({
+                                          key1: primaryColor,
+                                          key2: secondaryColor,
+                                          key3: secondaryColor,
+                                          key4: primaryColor
+                                        });
+                                      }
+                                    } catch (error) {
+                                      console.error('Failed to extract colors from background:', error);
+                                    }
+                                  }}
+                                  className="w-full"
+                                >
+                                  <ImageIcon className="h-4 w-4 mr-2" />
+                                  Get Accent Colors from Background
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-end pt-4">
+                          <Button onClick={() => {
+                            setNoteColors(tempNoteColors);
+                            setCustomizationOpen(false);
+                          }}>Save</Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <div className="flex justify-center rounded-lg bg-secondary/30 p-2">
                   {beatmap ? (
                     <canvas
@@ -411,7 +649,7 @@ const Index = () => {
               <Card className="animate-slide-up">
                 <CardContent className="p-4 space-y-4">
                   <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Render Settings</h2>
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">FPS</span>
@@ -451,9 +689,25 @@ const Index = () => {
                         step={5}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Resolution</span>
+                        <span className="text-foreground font-mono">{videoResolution}</span>
+                      </div>
+                      <Select value={videoResolution} onValueChange={(value: '1080p' | '720p' | '480p') => setVideoResolution(value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1080p">1080p (1920×1080)</SelectItem>
+                          <SelectItem value="720p" disabled>720p (1280×720) - Soon</SelectItem>
+                          <SelectItem value="480p" disabled>480p (854×480) - Soon</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>Resolution: 1920×1080</span>
+                    <span>Resolution: {videoResolution === '1080p' ? '1920×1080' : videoResolution === '720p' ? '1280×720' : '854×480'}</span>
                     <span>•</span>
                     <span>Duration: {Math.floor(estimatedSeconds / 60)}:{(estimatedSeconds % 60).toString().padStart(2, '0')}</span>
                     <span>•</span>
@@ -504,9 +758,7 @@ const Index = () => {
             {/* Empty state */}
             {!beatmap && !error && (
               <div className="py-16 text-center text-muted-foreground animate-slide-up">
-                <Upload className="mx-auto mb-4 h-12 w-12 opacity-30" />
-                <p className="text-lg">Upload a beatmap to get started</p>
-                <p className="text-sm mt-1">Load a .osu file and optionally a .osr replay</p>
+                
               </div>
             )}
           </div>
@@ -514,11 +766,18 @@ const Index = () => {
       </main>
 
       {/* Bottom bubble */}
-      <div className="fixed bottom-4 right-4 z-40">
+      <div className="fixed bottom-4 left-4 z-40">
         <div className="rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground shadow-lg border border-border/50 flex items-center gap-2">
           <span>Made with</span>
           <Heart className="h-4 w-4 text-red-500 fill-current" />
-          <span>Sekaide</span>
+          <a
+            href="https://discord.com/users/764107134119051294"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            Sekaide
+          </a>
         </div>
       </div>
     </div>
