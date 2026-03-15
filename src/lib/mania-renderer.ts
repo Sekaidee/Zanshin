@@ -4,7 +4,7 @@ import { ReplayFrame } from './osr-parser';
 const LANE_COLORS = ['#ff6b9d', '#51e5ff', '#51e5ff', '#ff6b9d'];
 const LANE_COLORS_DIM = ['#ff6b9d40', '#51e5ff40', '#51e5ff40', '#ff6b9d40'];
 const BG_COLOR = '#08080f';
-const LANE_BG = ['#12121e', '#0f0f1c', '#0f0f1c', '#12121e'];
+const LANE_BG = ['rgba(18, 18, 30, 0.7)', 'rgba(15, 15, 28, 0.7)', 'rgba(15, 15, 28, 0.7)', 'rgba(18, 18, 30, 0.7)'];
 
 export function renderFrame(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
@@ -13,7 +13,9 @@ export function renderFrame(
   replayFrames: ReplayFrame[],
   width: number,
   height: number,
-  scrollSpeed: number
+  scrollSpeed: number,
+  backgroundImage?: HTMLImageElement | ImageBitmap,
+  backgroundDim: number = 0
 ) {
   const playfieldWidth = Math.min(width * 0.3, 400);
   const playfieldX = (width - playfieldWidth) / 2;
@@ -23,16 +25,47 @@ export function renderFrame(
   const pixelsPerMs = judgmentY / scrollSpeed;
 
   // Background
-  ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, width, height);
+  if (backgroundImage) {
+    // Draw background image with cover scaling
+    const imgAspect = backgroundImage.width / backgroundImage.height;
+    const canvasAspect = width / height;
+    
+    let drawWidth, drawHeight, drawX, drawY;
+    
+    if (imgAspect > canvasAspect) {
+      // Image is wider than canvas - scale to cover height, center horizontally
+      drawHeight = height;
+      drawWidth = height * imgAspect;
+      drawX = (width - drawWidth) / 2;
+      drawY = 0;
+    } else {
+      // Image is taller than canvas - scale to cover width, center vertically
+      drawWidth = width;
+      drawHeight = width / imgAspect;
+      drawX = 0;
+      drawY = (height - drawHeight) / 2;
+    }
+    
+    ctx.drawImage(backgroundImage, drawX, drawY, drawWidth, drawHeight);
+    
+    // Apply dim overlay if specified
+    if (backgroundDim > 0) {
+      ctx.fillStyle = `rgba(0, 0, 0, ${backgroundDim / 100})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+  } else {
+    // Default background
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, width, height);
 
-  // Subtle background gradient
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-  bgGrad.addColorStop(0, '#0a0a18');
-  bgGrad.addColorStop(0.5, '#08080f');
-  bgGrad.addColorStop(1, '#0c0c14');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, width, height);
+    // Subtle background gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+    bgGrad.addColorStop(0, '#0a0a18');
+    bgGrad.addColorStop(0.5, '#08080f');
+    bgGrad.addColorStop(1, '#0c0c14');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   // Lane backgrounds
   for (let i = 0; i < 4; i++) {

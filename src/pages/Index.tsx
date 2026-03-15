@@ -27,6 +27,8 @@ const Index = () => {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [suggestedAudioName, setSuggestedAudioName] = useState<string>('');
   const [backgroundImage, setBackgroundImage] = useState<File | null>(null);
+  const [backgroundImageElement, setBackgroundImageElement] = useState<HTMLImageElement | null>(null);
+  const [backgroundDim, setBackgroundDim] = useState(30);
 
   const handleOsuFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,6 +80,13 @@ const Index = () => {
   const handleBackgroundImage = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      setBackgroundImageElement(img);
+    };
+    img.src = URL.createObjectURL(file);
+    
     setBackgroundImage(file);
     setError(null);
     setVideoBlob(null);
@@ -104,8 +113,8 @@ const Index = () => {
 
     const duration = getMapDuration(beatmap.notes);
     const time = (previewTime / 100) * duration;
-    renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed);
-  }, [beatmap, replay, scrollSpeed, previewTime, playing]);
+    renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim);
+  }, [beatmap, replay, scrollSpeed, previewTime, playing, backgroundImageElement, backgroundDim]);
 
   // Playback loop
   useEffect(() => {
@@ -135,7 +144,7 @@ const Index = () => {
           return 100;
         }
         const time = (next / 100) * duration;
-        renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed);
+        renderFrame(ctx, time, beatmap.notes, replay?.frames || [], 640, 360, scrollSpeed, backgroundImageElement || undefined, backgroundDim);
         return next;
       });
       animFrameRef.current = requestAnimationFrame(tick);
@@ -173,13 +182,25 @@ const Index = () => {
 
       const replayFrames = replay?.frames || [];
 
+      // Load background image for video rendering
+      let backgroundBitmap: ImageBitmap | undefined;
+      if (backgroundImage) {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = URL.createObjectURL(backgroundImage);
+        });
+        backgroundBitmap = await createImageBitmap(img);
+      }
+
       console.log(`Starting render at ${width}x${height}...`);
       const result = await encodeVideo(
         offscreen,
         totalFrames,
         (frameIndex, targetWidth, targetHeight) => {
           const time = (frameIndex / fps) * 1000;
-          renderFrame(ctx, time, beatmap.notes, replayFrames, targetWidth, targetHeight, scrollSpeed);
+          renderFrame(ctx, time, beatmap.notes, replayFrames, targetWidth, targetHeight, scrollSpeed, backgroundBitmap, backgroundDim);
         },
         { width, height, fps, bitrate: 8_000_000 },
         setProgress,
@@ -202,7 +223,7 @@ const Index = () => {
     } finally {
       setRendering(false);
     }
-  }, [beatmap, replay, fps, scrollSpeed, audioFile]);
+  }, [beatmap, replay, fps, scrollSpeed, audioFile, backgroundImage, backgroundDim]);
 
   const handleDownload = useCallback(() => {
     if (!videoBlob) return;
@@ -390,7 +411,7 @@ const Index = () => {
               <Card className="animate-slide-up">
                 <CardContent className="p-4 space-y-4">
                   <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Render Settings</h2>
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">FPS</span>
@@ -415,6 +436,19 @@ const Index = () => {
                         min={300}
                         max={1500}
                         step={50}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Background Dim</span>
+                        <span className="text-foreground font-mono">{backgroundDim}%</span>
+                      </div>
+                      <Slider
+                        value={[backgroundDim]}
+                        onValueChange={([v]) => setBackgroundDim(v)}
+                        min={0}
+                        max={100}
+                        step={5}
                       />
                     </div>
                   </div>
