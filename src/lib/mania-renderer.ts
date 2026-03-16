@@ -6,6 +6,11 @@ const LANE_COLORS_DIM = ['#ff6b9d40', '#51e5ff40', '#51e5ff40', '#ff6b9d40'];
 const BG_COLOR = '#08080f';
 const LANE_BG = ['rgba(18, 18, 30, 0.7)', 'rgba(15, 15, 28, 0.7)', 'rgba(15, 15, 28, 0.7)', 'rgba(18, 18, 30, 0.7)'];
 
+// Combo transition state
+let previousCombo = 0;
+let comboTransitionStart = 0;
+let comboTransitionDuration = 300; // ms
+
 export function renderFrame(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   currentTime: number,
@@ -25,6 +30,10 @@ export function renderFrame(
     noteColors.key3 + '40',
     noteColors.key4 + '40'
   ] : LANE_COLORS_DIM;
+
+  // Use reference height for UI elements to match preview scaling
+  const referenceHeight = 360;
+  const uiScale = height / referenceHeight;
 
   // Background
   if (backgroundImage) {
@@ -210,7 +219,7 @@ export function renderFrame(
 
   // Side info: time display
   ctx.fillStyle = '#ffffff60';
-  ctx.font = `${Math.max(12, height * 0.014)}px monospace`;
+  ctx.font = `${Math.max(12, referenceHeight * 0.014) * uiScale}px Tajawal, monospace`;
   ctx.textAlign = 'left';
   const mins = Math.floor(currentTime / 60000);
   const secs = Math.floor((currentTime % 60000) / 1000);
@@ -218,12 +227,17 @@ export function renderFrame(
 
   // Combo counter based on actual replay hits
   let combo = 0;
+  let score = 0;
+  let totalNotes = 0;
+  let hitNotes = 0;
+  
   if (replayFrames.length > 0) {
-    // Analyze replay data to count actual hits
+    // Analyze replay data to count actual hits and calculate score
     let consecutiveHits = 0;
     
     for (const note of notes) {
       if (note.time > currentTime) break;
+      totalNotes++;
       
       // Check if this note was hit by looking for key presses near the note time
       const hitWindow = 80; // ms hit window (similar to osu!mania)
@@ -234,6 +248,7 @@ export function renderFrame(
         if (Math.abs(frame.time - note.time) <= hitWindow) {
           if (frame.keys[note.column]) {
             wasHit = true;
+            hitNotes++;
             break;
           }
         }
@@ -244,6 +259,8 @@ export function renderFrame(
       if (wasHit) {
         consecutiveHits++;
         combo = consecutiveHits;
+        // Score calculation: base score + combo bonus
+        score += 100 + (combo * 10);
       } else {
         // Miss - reset combo
         consecutiveHits = 0;
@@ -255,32 +272,89 @@ export function renderFrame(
     for (const note of notes) {
       if (note.time < currentTime) {
         combo++;
+        totalNotes++;
+        hitNotes++;
+        score += 100 + (combo * 10);
       } else {
+        totalNotes++;
         break;
       }
     }
   }
 
-  if (combo > 0) {
+  // Calculate total duration for progress
+  const totalDuration = getMapDuration(notes);
+
+  // Draw score and progress in top right
+  if (totalNotes > 0) {
     ctx.save();
     
+    const scoreText = score.toLocaleString();
+    const scoreX = width - 20 * uiScale;
+    const scoreY = 20 * uiScale;
+    
+    // Circular progress indicator (drawn first so score appears on top)
+    const progressRadius = Math.max(8, referenceHeight * 0.01) * uiScale; // Smaller radius
+    const progressX = width - 20 * uiScale; // Positioned under score
+    const progressY = scoreY + 35 * uiScale; // Positioned below score
+    const progress = Math.min(currentTime / totalDuration, 1);
+    
+    // Background circle
+    ctx.strokeStyle = '#ffffff20';
+    ctx.lineWidth = 3.0;
+    ctx.beginPath();
+    ctx.arc(progressX, progressY, progressRadius, 0, 2 * Math.PI);
+    ctx.stroke();
+    
+    // Progress arc
+    ctx.strokeStyle = '#51e5ff';
+    ctx.lineWidth = 3.0;
+    ctx.beginPath();
+    ctx.arc(progressX, progressY, progressRadius, -Math.PI / 2, -Math.PI / 2 + (progress * 2 * Math.PI));
+    ctx.stroke();
+    
+    // Score display (drawn after progress so it appears on top)
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `${Math.max(24, referenceHeight * 0.03) * uiScale}px Tajawal, Arial, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    
+    ctx.fillText(scoreText, scoreX, scoreY);
+    
+    ctx.restore();
+  }
+
+  if (combo > 0) {
+    ctx.save();
+
+    // Check for combo decrease and start transition
+    if (combo < previousCombo) {
+      comboTransitionStart = currentTime;
+    }
+    previousCombo = combo;
+
+    // Calculate transition progress
+    const transitionProgress = Math.min(1, (currentTime - comboTransitionStart) / comboTransitionDuration);
+    const easeOut = 1 - Math.pow(1 - transitionProgress, 3); // Cubic ease-out
+
     // Calculate animation based on current time (simple pulsing effect)
     const pulse = Math.sin(currentTime * 0.01) * 0.1 + 0.9; // Subtle pulsing
-    const scale = combo > 1 ? 1.0 + (pulse * 0.1) : 1.0; // Scale up for higher combos
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.max(24, height * 0.028) * scale}px Arial`;
+    const baseScale = combo > 1 ? 1.0 + (pulse * 0.05) : 1.0; // Reduced scale for higher combos
+
+    // Add transition scale down and fade out
+    const transitionScale = combo < previousCombo ? 0.7 + (easeOut * 0.3) : 1;
+    const transitionOpacity = combo < previousCombo ? 0.3 + (easeOut * 0.7) : 1;
+    const scale = baseScale * transitionScale;
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${transitionOpacity})`;
+    ctx.font = `bold ${Math.max(20, referenceHeight * 0.024) * scale * uiScale}px Tajawal, Arial, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    
-    // Add glow effect that intensifies with combo
-    ctx.shadowColor = combo > 10 ? '#ff6b9d' : '#ffffff';
-    ctx.shadowBlur = Math.min(20, combo * 2);
-    
+
     const comboText = `${combo}x`;
     const comboX = 20; // Left side of the video
     const comboY = height - 40;
-    
+
     ctx.fillText(comboText, comboX, comboY);
     ctx.restore();
   }

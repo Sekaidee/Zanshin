@@ -274,25 +274,26 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/50 px-6 py-4">
         <div className="mx-auto flex max-w-7xl items-center gap-3">
-          <img src={zanshinLogo} alt="Zanshin" className="h-7 w-7" />
+          {/*<img src={zanshinLogo} alt="Zanshin" className="h-7 w-7" />*/}
           <Link to="/" className="text-xl font-bold tracking-tight text-foreground hover:text-primary transition-colors">
             Zanshin<span className="text-primary">残心</span>
           </Link>
         </div>
       </header>
 
-      {/* 4Keys support note */}
-      <div className="mx-auto max-w-7xl px-6 py-4">
-        <div className="rounded-lg border-2 border-primary/50 bg-primary/5 px-4 py-2 text-center text-sm font-medium text-primary shadow-lg shadow-primary/20">
-          This app supports only 4Keys
-        </div>
-      </div>
-
       <main className="mx-auto max-w-7xl px-6 py-8">
+        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Panel - File Selection Steps */}
           <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-lg font-semibold text-foreground mb-6">Select Files</h2>
+            {/* 4Keys support note - moved above Select Files */}
+        <div className="mb-8">
+          <div className="rounded-lg border-2 border-primary/50 bg-primary/5 px-4 py-2 text-left text-sm font-medium ">
+            <span className="text-primary">Note : </span> <span className="text-white">This app supports only </span> <span className="text-primary">4Keys</span> <br></br><span className="text-white">I hope you like it ♥</span>
+          </div>
+        </div>
+            <h2 className="text-lg font-semibold text-foreground mb-6">Let's get started</h2>
             
             {/* Step 1: Select Replay */}
             <Card className={`cursor-pointer transition-all ${replay ? 'border-accent bg-accent/5' : 'hover:border-accent/40 hover:glow-accent'}`} onClick={() => osrInputRef.current?.click()}>
@@ -316,21 +317,21 @@ const Index = () => {
             </Card>
 
             {/* Step 2: Select Osu File */}
-            <Card className={`cursor-pointer transition-all ${beatmap ? 'border-primary bg-primary/5' : 'hover:border-primary/40 hover:glow-primary'}`} onClick={() => osuInputRef.current?.click()}>
+            <Card className={`cursor-pointer transition-all ${beatmap ? 'border-pink-500 bg-pink-500/5' : 'hover:border-pink-500/40 hover:glow-pink'}`} onClick={() => osuInputRef.current?.click()}>
               <CardContent className="flex items-center gap-4 p-4">
                 <input ref={osuInputRef} type="file" accept=".osu" onChange={handleOsuFile} className="hidden" />
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${beatmap ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${beatmap ? 'bg-pink-500 text-white' : 'bg-secondary text-muted-foreground'}`}>
                   2
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <Music className={`h-5 w-5 ${beatmap ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className={`font-medium ${beatmap ? 'text-primary' : 'text-muted-foreground'}`}>Select Osu File</span>
-                    {beatmap && <Check className="h-4 w-4 text-primary" />}
+                    <Music className={`h-5 w-5 ${beatmap ? 'text-pink-500' : 'text-muted-foreground'}`} />
+                    <span className={`font-medium ${beatmap ? 'text-pink-500' : 'text-muted-foreground'}`}>Select Osu File</span>
+                    {beatmap && <Check className="h-4 w-4 text-pink-500" />}
                   </div>
                   <p className="text-xs text-muted-foreground">.osu (osu!mania 4K)</p>
                   {beatmap && (
-                    <p className="text-xs text-primary mt-1 truncate">{beatmap.artist} - {beatmap.title}</p>
+                    <p className="text-xs text-pink-500 mt-1 truncate">{beatmap.artist} - {beatmap.title}</p>
                   )}
                 </div>
               </CardContent>
@@ -765,8 +766,8 @@ const Index = () => {
         </div>
       </main>
 
-      {/* Bottom bubble */}
-      <div className="fixed bottom-4 left-4 z-40">
+      {/* Attribution */}
+      <div className="flex justify-center py-4">
         <div className="rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground shadow-lg border border-border/50 flex items-center gap-2">
           <span>Made with</span>
           <Heart className="h-4 w-4 text-red-500 fill-current" />

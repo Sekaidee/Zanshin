@@ -41,13 +41,26 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    overflow: hidden;
+  }
+
+  /* Hide scrollbar */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: none;
   }
 }
 
 @layer utilities {
   .glow-primary {
     box-shadow: 0 0 20px hsl(198 87% 52% / 0.3), 0 0 60px hsl(198 87% 52% / 0.1);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 20px hsl(327 73% 57% / 0.3), 0 0 60px hsl(327 73% 57% / 0.1);
   }
   .glow-accent {
     box-shadow: 0 0 20px hsl(190 95% 55% / 0.3), 0 0 60px hsl(190 95% 55% / 0.1);
