@@ -40,7 +40,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: 'Tajawal', 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
 
   /* Hide scrollbar */
@@ -67,5 +67,9 @@
   }
   .glow-green-500 {
     box-shadow: 0 0 20px hsl(142 76% 36% / 0.3), 0 0 60px hsl(142 76% 36% / 0.1);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px hsl(262 83% 58% / 0.3), 0 0 60px hsl(262 83% 58% / 0.1);
   }
 }

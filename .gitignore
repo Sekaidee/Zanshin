@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Bun
+bun.lockb
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+
+# Vite
+vite.config.ts.timestamp-*
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
