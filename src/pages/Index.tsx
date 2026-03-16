@@ -483,7 +483,7 @@ const Index = () => {
                             
                             {backgroundImage && (
                               <div className="pt-2">
-                                <Button
+                                {/*<Button
                                   variant="outline"
                                   size="sm"
                                   onClick={async () => {
@@ -593,7 +593,7 @@ const Index = () => {
                                 >
                                   <ImageIcon className="h-4 w-4 mr-2" />
                                   Get Accent Colors from Background
-                                </Button>
+                                </Button>*/}
                               </div>
                             )}
                           </div>
