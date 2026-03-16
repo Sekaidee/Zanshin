@@ -30,7 +30,7 @@ The idea is to capture gameplay in a clean and easy way so replays can be shared
 
 ## Sekaide
 
-A small message to osu!mania players:
+**A small message to osu!mania players :**
 I'm a mania player myself, and I created this project because I love the game and wanted to build something for the community. I put a lot of time and effort into it, and I really hope you enjoy it. If you have ideas, suggestions, or feedback, feel free to share them — they’re always welcome. ^^
 
 
