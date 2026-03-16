@@ -3,6 +3,7 @@
     <img src="https://github.com/Sekaidee/Zanshin/blob/cc24a1cf7e8f510ba1f8868ef3a946583fc33593/src/assets/Zanshin.png" width="300">
   </a>
 </p>
+
 ## Zanshin
 
 Zanshin 残心 is a project I'm working on to render osu!mania replays into videos.
