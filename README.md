@@ -8,6 +8,10 @@
 Zanshin 残心 is a project I'm working on to render osu!mania replays into videos.
 The idea is to capture gameplay in a clean and easy way so replays can be shared or archived. It's still in development and I'm gradually improving it.
 
+<p align="center">
+<img src="https://github.com/Sekaidee/Zanshin/blob/da5f340cbf49182a813ddda19c40e3c30aea2d51/src/assets/Screenshots/Preview.png">
+</p>
+
 ## Features
 
 - **Real-time preview** so you can see how the replay will look before rendering.
